@@ -42,10 +42,18 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
     Tab(text: 'p: share',),
   ];
   //
-  List<List<GithubIssue>> issueList=[[],[],[],[],[],[]];
+  List<List<GithubIssue>> _issueList=[[],[],[],[],[],[]];
+  List<Setting> _settingList=[
+    Setting(false, false, 0),
+    Setting(false, false, 0),
+    Setting(false, false, 0),
+    Setting(false, false, 0),
+    Setting(false, false, 0),
+    Setting(false, false, 0)];
+
   TabController _tabController;
   int _activeIndex = 0;
-  var _setting = Setting(false, false, 0);
+//  var _setting = Setting(false, false, 0);
 
   @override
   void initState(){
@@ -60,10 +68,10 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
   }
 
   void _setIssueList(int index){
-    if(issueList[index].length == 0){
-      _getIssues(index,_setting).then((value){
+    if(_issueList[index].length == 0){
+      _getIssues(index,_settingList[index]).then((value){
         setState(() {
-          issueList[index] = value;
+          _issueList[index] = value;
         });
       });
     }
@@ -91,48 +99,60 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         controller: _tabController,
         children: <Widget>[
           //all
-          issueList[0].length != 0 ?
-          TabPage(issues: issueList[0],) :
-          Center(
-            child: Text('Issueの読み込み中です'),
-          ),
+          _issueList[0].length != 0 ?
+          TabPage(issues: _issueList[0],) :
+          Center(child: Text('Issueの読み込み中です'),),
           //p: webview
-          issueList[1].length != 0 ?
-          TabPage(issues: issueList[1],):
+          _issueList[1].length != 0 ?
+          TabPage(issues: _issueList[1],):
           Center(child: Text('Issueの読み込み中です'),),
           //
-          issueList[2].length != 0 ?
-          TabPage(issues: issueList[2],):
+          _issueList[2].length != 0 ?
+          TabPage(issues: _issueList[2],):
           Center(child: Text('Issueの読み込み中です'),),
           //
-          issueList[3].length != 0 ?
-          TabPage(issues: issueList[3],):
+          _issueList[3].length != 0 ?
+          TabPage(issues: _issueList[3],):
           Center(child: Text('Issueの読み込み中です'),),
           //
-          issueList[4].length != 0 ?
-          TabPage(issues: issueList[4],):
+          _issueList[4].length != 0 ?
+          TabPage(issues: _issueList[4],):
           Center(child: Text('Issueの読み込み中です'),),
           //
-          issueList[5].length != 0 ?
-          TabPage(issues: issueList[5],):
+          _issueList[5].length != 0 ?
+          TabPage(issues: _issueList[5],):
           Center(child: Text('Issueの読み込み中です'),),
         ],
       ),
     );
   }
   void _showSetting() async{
+    //現在の設定値を保持
+    final bkexcludeClosedIssues = _settingList[_activeIndex].excludeClosedIssues;
+    final bkexcludeOldIssues = _settingList[_activeIndex].excludeOldIssues;
+    final bksortType = _settingList[_activeIndex].sortType;
+
+    //ダイアログの表示
     final result = await showDialog<Setting>(
         context: context,
         builder: (_){
-          return SettingPage(setting: _setting,);
+          return SettingPage(setting: _settingList[_activeIndex],);
         }
     );
+
+    //設定ダイアログクローズ時のパラメータチェック
     if(result != null){
-      _setting = result;
+      //更新ボタンが押された場合、リストの更新を実行する
+      _settingList[_activeIndex] = result;
       setState(() {
-        issueList.forEach((element) {element.clear();});
+        _issueList[_activeIndex].clear();
       });
       _setIssueList(_activeIndex);
+    }else{
+      //更新ボタンを押されずにダイアログが閉じた場合、操作前の設定値に戻す
+      _settingList[_activeIndex].excludeClosedIssues = bkexcludeClosedIssues;
+      _settingList[_activeIndex].excludeOldIssues = bkexcludeOldIssues;
+      _settingList[_activeIndex].sortType = bksortType;
     }
   }
 
@@ -186,6 +206,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
       dateQuery = '&since='+ oneYearsAgo.toIso8601String();
     }
 
+    //apiリクエストの実行
     final respons = await http.get('https://api.github.com/repos/flutter/flutter/issues'+stateQuery+dateQuery+labelsquery+sortQuery);
     if(respons.statusCode == 200){
       List<GithubIssue> list =[];
