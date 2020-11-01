@@ -31,8 +31,6 @@ class MainPage extends StatefulWidget{
 }
 
 class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin{
-
-
   final _tab = <Tab> [
     Tab(text: 'all',),
     Tab(text: 'p: webview',),
@@ -51,32 +49,62 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
     Setting(false, false, 0),
     Setting(false, false, 0)];
 
+  List<int> _pageList = [1,1,1,1,1,1];
+  List<bool> _loadStateList = [false,false,false,false,false,false];
+
   TabController _tabController;
+  ScrollController _scrollController;
   int _activeIndex = 0;
-//  var _setting = Setting(false, false, 0);
 
   @override
   void initState(){
     super.initState();
     _tabController = TabController(vsync:this,length: _tab.length);
     _tabController.addListener(_setActiveTabIndex);
+
+    _scrollController = ScrollController();
+    _scrollController.addListener(_setScrollEvent);
+
     _setIssueList(0);
   }
   void _setActiveTabIndex(){
     _activeIndex = _tabController.index;
     _setIssueList(_activeIndex);
   }
-
+  void _setScrollEvent(){
+    final maxScrollExtent = _scrollController.position.maxScrollExtent;
+    final currentPosition = _scrollController.position.pixels;
+    if (maxScrollExtent > 0 &&
+        (maxScrollExtent - 20.0) <= currentPosition) {
+      //
+      _addIssueList(_activeIndex);
+    }
+  }
   void _setIssueList(int index){
-    if(_issueList[index].length == 0){
-      _getIssues(index,_settingList[index]).then((value){
+    //既にIssueリストを取得している場合、実行しない
+    if(_issueList[index].length != 0){
+      return;
+    }
+      _getIssues(index,_settingList[index],1).then((value){
         setState(() {
           _issueList[index] = value;
         });
       });
-    }
   }
-
+  void _addIssueList(int index){
+    //Issueリスト読み込み中の場合、実行しない
+    if(_loadStateList[index] == true) {
+      return;
+    }
+    _loadStateList[index] = true;
+    _pageList[index]++;
+    _getIssues(index, _settingList[index], _pageList[index]).then((value){
+      setState(() {
+        _issueList[index].addAll(value);
+        _loadStateList[index] = false;
+      });
+    });
+  }
   @override
   void dispose(){
     _tabController.dispose();
@@ -100,27 +128,27 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         children: <Widget>[
           //all
           _issueList[0].length != 0 ?
-          TabPage(issues: _issueList[0],) :
+          TabPage(issues: _issueList[0],scrollController: _scrollController,) :
           Center(child: Text('Issueの読み込み中です'),),
           //p: webview
           _issueList[1].length != 0 ?
-          TabPage(issues: _issueList[1],):
+          TabPage(issues: _issueList[1],scrollController: _scrollController,):
           Center(child: Text('Issueの読み込み中です'),),
           //
           _issueList[2].length != 0 ?
-          TabPage(issues: _issueList[2],):
+          TabPage(issues: _issueList[2],scrollController: _scrollController,):
           Center(child: Text('Issueの読み込み中です'),),
           //
           _issueList[3].length != 0 ?
-          TabPage(issues: _issueList[3],):
+          TabPage(issues: _issueList[3],scrollController: _scrollController,):
           Center(child: Text('Issueの読み込み中です'),),
           //
           _issueList[4].length != 0 ?
-          TabPage(issues: _issueList[4],):
+          TabPage(issues: _issueList[4],scrollController: _scrollController,):
           Center(child: Text('Issueの読み込み中です'),),
           //
           _issueList[5].length != 0 ?
-          TabPage(issues: _issueList[5],):
+          TabPage(issues: _issueList[5],scrollController: _scrollController,):
           Center(child: Text('Issueの読み込み中です'),),
         ],
       ),
@@ -147,6 +175,9 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
       setState(() {
         _issueList[_activeIndex].clear();
       });
+      //絞りこみ条件が更新された為、ページ数をリセット
+      _pageList[_activeIndex]=1;
+      //Issueリストの取得
       _setIssueList(_activeIndex);
     }else{
       //更新ボタンを押されずにダイアログが閉じた場合、操作前の設定値に戻す
@@ -157,11 +188,12 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
   }
 
   //issuesの取得処理
-  Future<List<GithubIssue>> _getIssues(int issueType,Setting setting) async{
+  Future<List<GithubIssue>> _getIssues(int issueType,Setting setting,int page) async{
     String sortQuery = '';
     String labelsquery = '';
     String stateQuery = '';
     String dateQuery = '';
+    String pageQuery = '';
     //ソートクエリの生成
     switch(setting.sortType){
       case 0:
@@ -195,6 +227,7 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
         labelsquery = '&labels=p: share';
         break;
     }
+    //issueのstateでの絞り込み
     if(setting.excludeClosedIssues){
       stateQuery = '?state=open';
     }else{
@@ -206,8 +239,11 @@ class _MainPageState extends State<MainPage> with SingleTickerProviderStateMixin
       dateQuery = '&since='+ oneYearsAgo.toIso8601String();
     }
 
+    //
+    pageQuery = "&page="+page.toString();
+
     //apiリクエストの実行
-    final respons = await http.get('https://api.github.com/repos/flutter/flutter/issues'+stateQuery+dateQuery+labelsquery+sortQuery);
+    final respons = await http.get('https://api.github.com/repos/flutter/flutter/issues'+stateQuery+dateQuery+labelsquery+sortQuery+pageQuery);
     if(respons.statusCode == 200){
       List<GithubIssue> list =[];
       List<dynamic> decoded = json.decode(respons.body);

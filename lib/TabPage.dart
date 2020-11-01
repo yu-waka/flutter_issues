@@ -4,7 +4,9 @@ import 'package:flutter_issues/Utility.dart';
 
 class TabPage extends StatelessWidget{
   final List<GithubIssue> issues;
-  const TabPage({Key key,this.issues}) :super(key: key);
+  final ScrollController scrollController;
+  const TabPage({Key key,this.issues,this.scrollController}) :super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -13,10 +15,12 @@ class TabPage extends StatelessWidget{
   }
   Widget _buildIssueList(){
     return ListView.builder(
+      controller: scrollController,
       itemBuilder:(BuildContext context,int index){
         return _buildCard(issues[index]);
       },
       itemCount: issues.length,
+
     );
   }
   Widget _buildCard(GithubIssue issue){
